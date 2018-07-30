@@ -1,18 +1,20 @@
 "use strict";
 
 var gulp = require("gulp"),
-	minifycss = require("gulp-clean-css"),
-	uglify = require("gulp-uglify"),
+	// minifycss = require("gulp-clean-css"),
+	// uglify = require("gulp-uglify"),
 	concat = require("gulp-concat"),
 	header = require("gulp-header"),
 	buffer = require("vinyl-buffer"),
 	pkg = require("./package.json"),
 	debug = require("gulp-debug"),
 	eslint = require("gulp-eslint"),
-	prettify = require("gulp-jsbeautifier"),
+	// prettify = require("gulp-jsbeautifier"),
 	browserify = require("browserify"),
 	source = require("vinyl-source-stream"),
-	rename = require("gulp-rename");
+	rename = require("gulp-rename"),
+	watch = require("gulp-watch"),
+    browserSync = require('browser-sync').create();
 
 var banner = ["/**",
 	" * <%= pkg.name %> v<%= pkg.version %>",
@@ -22,24 +24,18 @@ var banner = ["/**",
 	" */",
 	""].join("\n");
 
-gulp.task("prettify-js", [], function() {
-	return gulp.src("./src/js/simplemde.js")
-		.pipe(prettify({js: {brace_style: "collapse", indent_char: "\t", indent_size: 1, max_preserve_newlines: 3, space_before_conditional: false}}))
-		.pipe(gulp.dest("./src/js"));
-});
- 
-gulp.task("prettify-css", [], function() {
-	return gulp.src("./src/css/simplemde.css")
-		.pipe(prettify({css: {indentChar: "\t", indentSize: 1}}))
-		.pipe(gulp.dest("./src/css"));
-});
+var css_files = [
+	"./node_modules/codemirror/lib/codemirror.css",
+	"./src/css/*.css",
+	"./node_modules/codemirror-spell-checker/src/css/spell-checker.css"
+];
 
-gulp.task("lint", ["prettify-js"], function() {
+gulp.task("lint", function() {
 	gulp.src("./src/js/**/*.js")
 		.pipe(debug())
 		.pipe(eslint())
-		.pipe(eslint.format())
-		.pipe(eslint.failAfterError());
+		.pipe(eslint.format());
+	// .pipe(eslint.failAfterError());
 });
 
 function taskBrowserify(opts) {
@@ -62,35 +58,52 @@ gulp.task("browserify", ["lint"], function() {
 		.pipe(header(banner, {pkg: pkg}))
 		.pipe(gulp.dest("./debug/"));
 });
-
-gulp.task("scripts", ["browserify:debug", "browserify", "lint"], function() {
+// "browserify:debug"
+gulp.task("scripts", ["browserify"], function() {
 	var js_files = ["./debug/simplemde.js"];
-	
+
 	return gulp.src(js_files)
 		.pipe(concat("simplemde.min.js"))
-		.pipe(uglify())
+		// .pipe(uglify())
 		.pipe(buffer())
 		.pipe(header(banner, {pkg: pkg}))
 		.pipe(gulp.dest("./dist/"));
 });
 
-gulp.task("styles", ["prettify-css"], function() {
-	var css_files = [
-		"./node_modules/codemirror/lib/codemirror.css",
-		"./src/css/*.css",
-		"./node_modules/codemirror-spell-checker/src/css/spell-checker.css"
-	];
-	
+gulp.task("scripts-watch", ["scripts"], function(done) {
+	browserSync.reload();
+	done();
+});
+
+gulp.task("styles", function() {
 	return gulp.src(css_files)
 		.pipe(concat("simplemde.css"))
-		.pipe(buffer())
-		.pipe(header(banner, {pkg: pkg}))
-		.pipe(gulp.dest("./debug/"))
-		.pipe(minifycss())
+		// .pipe(buffer())
+		// .pipe(header(banner, {pkg: pkg}))
+		// .pipe(gulp.dest("./debug/"))
+		// .pipe(minifycss())
 		.pipe(rename("simplemde.min.css"))
 		.pipe(buffer())
 		.pipe(header(banner, {pkg: pkg}))
 		.pipe(gulp.dest("./dist/"));
 });
 
-gulp.task("default", ["scripts", "styles"]);
+gulp.task("styles-watch", ["styles"], function(done) {
+	browserSync.reload();
+	done();
+});
+
+// Static Server + watching scss/html files
+gulp.task("serve", [], function() {
+	browserSync.init({
+		server: "./dist"
+	});
+
+	gulp.watch(css_files, ["styles-watch"]);
+	gulp.watch("./src/js/**/*.js", ["scripts-watch"]);
+	gulp.watch("dist/*.html").on("change", browserSync.reload);
+});
+
+gulp.task("default", ["scripts", "styles", "serve"]);
+
+// TODO add clean task (delete dist) before serving/building

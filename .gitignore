@@ -1,7 +1,7 @@
 localtesting/
 node_modules/
 bower_components/
-
+dist
 #For IDE
 *.iml
 *.ipr
